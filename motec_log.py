@@ -86,10 +86,10 @@ class MotecLog(object):
         multiplier = 1
         scale = 1
 
-        # Decimal places must be hard coded to zero, the ldparser library doesn't properly
-        # handle non zero values, consequently all channels will have zero decimal places
-        # decimals = log_channel.decimals
-        decimals = 0
+        # CSV parsing records the maximum decimal precision observed for
+        # each channel. Preserve it so generated logs display fractional
+        # values correctly in MoTeC i2.
+        decimals = log_channel.decimals
 
         ld_channel = ldChan(None, meta_ptr, prev_meta_ptr, next_meta_ptr, data_ptr, data_len, \
             data_type, freq, shift, multiplier, scale, decimals, log_channel.name, "", \
