@@ -59,24 +59,14 @@ class MotecLog(object):
 
         log_channel: data_log.Channel
         """
-        # Advance the header data pointer
-        self.ld_header.data_ptr += self.CHANNEL_HEADER_SIZE
-
-        # Advance the data pointers of all previous channels
-        for ld_channel in self.ld_channels:
-            ld_channel.data_ptr += self.CHANNEL_HEADER_SIZE
-
         # Determine our file pointers
         if self.ld_channels:
             meta_ptr = self.ld_channels[-1].next_meta_ptr
             prev_meta_ptr = self.ld_channels[-1].meta_ptr
-            data_ptr = self.ld_channels[-1].data_ptr + self.ld_channels[-1]._data.nbytes
         else:
             # First channel needs the previous pointer zero'd out
             meta_ptr = self.HEADER_PTR
             prev_meta_ptr = 0
-            data_ptr = self.ld_header.data_ptr
-        next_meta_ptr = meta_ptr + self.CHANNEL_HEADER_SIZE
 
         # Channel specs
         data_len = len(log_channel.messages)
@@ -91,9 +81,22 @@ class MotecLog(object):
         # values correctly in MoTeC i2.
         decimals = log_channel.decimals
 
-        ld_channel = ldChan(None, meta_ptr, prev_meta_ptr, next_meta_ptr, data_ptr, data_len, \
+        ld_channel = ldChan(None, meta_ptr, prev_meta_ptr, 0, 0, data_len, \
             data_type, freq, shift, multiplier, scale, decimals, log_channel.name, "", \
             log_channel.units)
+
+        metadata_size = ld_channel.metadata_size()
+        self.ld_header.data_ptr += metadata_size
+        for existing_channel in self.ld_channels:
+            existing_channel.data_ptr += metadata_size
+
+        if self.ld_channels:
+            data_ptr = self.ld_channels[-1].data_ptr + self.ld_channels[-1]._data.nbytes
+        else:
+            data_ptr = self.ld_header.data_ptr
+
+        ld_channel.data_ptr = data_ptr
+        ld_channel.next_meta_ptr = meta_ptr + metadata_size
 
         # Add in the channel data
         ld_channel._data = np.array([], data_type)
