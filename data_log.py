@@ -1,5 +1,7 @@
 import cantools
+import csv
 import math
+import re
 
 class DataLog(object):
     """ Container for storing log data which contains a set of channels with time series data."""
@@ -85,8 +87,9 @@ class DataLog(object):
         """ Creates channels populated with messages from a CSV log file.
 
         This will create a channel for each column in the CSV file, with the name of that channel
-        taken from the CSV header. All channels will be created without any units. Any non numeric data
-        will be ignored, and that channel will be removed. The first column of data must be time
+        taken from the CSV header. Headers in the form "Name (unit)" will assign the MoTeC display
+        unit for that channel. Any non numeric data will be ignored, and that channel will be
+        removed. The first column of data must be time.
 
         log_lines: List, containing CSV log lines
         """
@@ -96,22 +99,25 @@ class DataLog(object):
             return
 
         # Get the channel names, ignore the first column as it is assumed to be time
-        header = log_lines[0]
-        channel_names = header.split(",")[1:]
+        rows = csv.reader(log_lines)
+        try:
+            header = next(rows)
+        except StopIteration:
+            return
+        channel_headers = header[1:]
 
         # We'll keep a map of names and column numbers for easy channel lookups when parsing rows
-        i = 0
         channel_dict = {}
-        for name in channel_names:
-            self.add_channel(name, "", float, 0)
-
-            channel_dict[name] = i
-            i += 1
+        for i, channel_header in enumerate(channel_headers):
+            name, units = self.__parse_channel_header(channel_header)
+            unique_name = self.__unique_channel_name(name)
+            self.add_channel(unique_name, units, float, 0)
+            channel_dict[unique_name] = i
 
         # Go through each line grabbing all the channel values
-        for line in log_lines[1:]:
-            line = line.strip("\n")
-            values = line.split(",")
+        for values in rows:
+            if not values:
+                continue
 
             # Timestamp is the first element
             t = float(values[0])
@@ -123,14 +129,15 @@ class DataLog(object):
             for name, i in channel_dict.items():
                 # We'll only parse numeric data
                 try:
-                    val = float(values[i + 1])
+                    val_text = values[i + 1]
+                    val = float(val_text)
                     message = Message(t, val)
                     self.channels[name].messages.append(message)
 
-                    val_text_split = values[i + 1].split(".")
+                    val_text_split = val_text.split(".")
                     decimals_present = 0 if len(val_text_split) == 1 else len(val_text_split[1])
                     self.channels[name].decimals = max(decimals_present, self.channels[name].decimals)
-                except ValueError:
+                except (IndexError, ValueError):
                     print("WARNING: Found non numeric values for channel %s, removing channel" % \
                         name)
                     invalid_channels.append(name)
@@ -152,20 +159,10 @@ class DataLog(object):
         self.from_csv_log(log_lines)
 
         # Accessport logs have a column for AP info which is not of any value so we'll delete it
-        for key in self.channels.keys():
+        for key in list(self.channels.keys()):
             if "AP Info" in key:
                 del self.channels[key]
                 break
-
-        # Update all the channel names and units
-        for channel_name, channel in self.channels.items():
-            # Channels have the format "Name (Units)"
-            print(channel_name)
-            name, units = channel_name.split(" (")
-            units = units[:-1]
-
-            channel.name = name
-            channel.units = units
 
     @staticmethod
     def __parse_can_log_line(line):
@@ -179,6 +176,31 @@ class DataLog(object):
         data = bytearray.fromhex(data)
 
         return stamp, bus, id, data
+
+    @staticmethod
+    def __parse_channel_header(header):
+        header = header.strip()
+        match = re.match(r"^(.*?)\s*\(([^()]*)\)\s*$", header)
+        if match:
+            name = match.group(1).strip()
+            units = match.group(2).strip()
+        else:
+            name = header
+            units = ""
+
+        if not name:
+            name = header
+
+        return name, units
+
+    def __unique_channel_name(self, name):
+        unique_name = name
+        suffix = 2
+        while unique_name in self.channels:
+            unique_name = "%s %d" % (name, suffix)
+            suffix += 1
+
+        return unique_name
 
     def __str__(self):
         output = "Log: %s, Duration: %f s" % (self.name, (self.end() - self.start()))

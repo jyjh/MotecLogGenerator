@@ -15,9 +15,9 @@ class MotecLog(object):
     """
     # Pointers to locations in the file where data sections should be written. These have been
     # determined from inspecting some MoTeC .ld files, and were consistent across all files.
-    VEHICLE_PTR = 1762
-    VENUE_PTR = 5078
-    EVENT_PTR = 8180
+    EVENT_PTR = 1762
+    VENUE_PTR = 4918
+    VEHICLE_PTR = 8020
     HEADER_PTR = 11336
 
     CHANNEL_HEADER_SIZE = struct.calcsize(ldChan.fmt)
