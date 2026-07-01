@@ -98,10 +98,13 @@ class MotecLog(object):
         ld_channel.data_ptr = data_ptr
         ld_channel.next_meta_ptr = meta_ptr + metadata_size
 
-        # Add in the channel data
-        ld_channel._data = np.array([], data_type)
-        for msg in log_channel.messages:
-            ld_channel._data = np.append(ld_channel._data, data_type(msg.value))
+        # Add in the channel data. Build the numpy array in one shot rather than
+        # growing it sample-by-sample (np.append in a loop is O(N^2)); count=
+        # lets numpy preallocate and convert dtypes in bulk.
+        ld_channel._data = np.fromiter(
+            (msg.value for msg in log_channel.messages),
+            dtype=data_type, count=data_len,
+        )
 
         # Add the ld channel and advance the file pointers
         self.ld_channels.append(ld_channel)

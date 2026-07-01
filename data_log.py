@@ -55,7 +55,8 @@ class DataLog(object):
         This will create a channel for each entry in the database that has messages present in the
         log.
 
-        log_lines: List, containing candump log lines (recorded with 'candump' with '-l')
+        log_lines: iterable of candump log lines (recorded with 'candump' with '-l'), e.g. a
+            file object opened for text reading
         can_db: cantools.database
         """
         self.clear()
@@ -91,7 +92,7 @@ class DataLog(object):
         unit for that channel. Any non numeric data will be ignored, and that channel will be
         removed. The first column of data must be time.
 
-        log_lines: List, containing CSV log lines
+        log_lines: iterable of CSV log lines, e.g. a file object opened for text reading
         """
         self.clear()
 
@@ -131,12 +132,15 @@ class DataLog(object):
                 try:
                     val_text = values[i + 1]
                     val = float(val_text)
-                    message = Message(t, val)
-                    self.channels[name].messages.append(message)
+                    # Cache the channel ref once per cell instead of re-looking up
+                    # self.channels[name] for the append and the decimals check.
+                    ch = self.channels[name]
+                    ch.messages.append(Message(t, val))
 
                     val_text_split = val_text.split(".")
                     decimals_present = 0 if len(val_text_split) == 1 else len(val_text_split[1])
-                    self.channels[name].decimals = max(decimals_present, self.channels[name].decimals)
+                    if decimals_present > ch.decimals:
+                        ch.decimals = decimals_present
                 except (IndexError, ValueError):
                     print("WARNING: Found non numeric values for channel %s, removing channel" % \
                         name)
@@ -153,7 +157,7 @@ class DataLog(object):
         channel taken from the CSV header. Any non numeric data will be ignored, and that channel
         will be removed.
 
-        log_lines: List, containing CSV log lines
+        log_lines: iterable of CSV log lines, e.g. a file object opened for text reading
         """
 
         self.from_csv_log(log_lines)

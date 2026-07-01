@@ -64,8 +64,6 @@ if __name__ == '__main__':
         exit(1)
 
     print("Loading log...")
-    with open(args.log, "r") as file:
-        lines = file.readlines()
 
     # Create our data log from the input data
     data_log = DataLog()
@@ -80,13 +78,16 @@ if __name__ == '__main__':
         can_db = cantools.database.load_file(args.dbc)
 
         print("Extracting data...")
-        data_log.from_can_log(lines, can_db)
+        with open(args.log, "r") as file:
+            data_log.from_can_log(file, can_db)
     elif args.log_type == "CSV":
         print("Extracting data...")
-        data_log.from_csv_log(lines)
+        with open(args.log, "r") as file:
+            data_log.from_csv_log(file)
     elif args.log_type == "ACCESSPORT":
         print("Extracting data...")
-        data_log.from_accessport_log(lines)
+        with open(args.log, "r") as file:
+            data_log.from_accessport_log(file)
 
     if not data_log.channels:
         print("ERROR: Failed to find any channels in log data")
