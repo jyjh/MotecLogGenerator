@@ -60,6 +60,25 @@ python3 motec_log_generator.py /path/to/my/data/accessport_data.csv ACCESSPORT
 
 This will generate a motec .ld file `/path/to/my/data/accessport_data.ld`.
 
+### Lap Beacons (`.ldx`)
+
+MoTeC i2 splits a log into laps using the beacons stored in a `.ldx` sidecar file. Supply a laps file via `--laps-file` and a matching `.ldx` is written alongside the `.ld`, using the same basename:
+
+```bash
+python3 motec_log_generator.py csv_data.csv CSV --laps-file laps.txt
+```
+
+This generates `csv_data.ld` (unchanged) **and** `csv_data.ldx`. The laps file contains one timestamp per line, in seconds, using the same time base as the input log (i.e. the first column of a CSV, or the candump timestamp). Each timestamp marks a start/finish crossing that **completes** a lap (a MoTeC `BCN` beacon); the final lap runs open-ended to the end of the log.
+
+Example `laps.txt`:
+```
+96.20
+190.51
+286.07
+```
+
+Lines that are blank or non-numeric are skipped with a warning. Timestamps before the log start are clamped to zero, and timestamps after the log end are flagged. Without `--laps-file`, no `.ldx` is written and behavior is unchanged.
+
 ### Additional Options
 A different destination and filename for the generated .ld file can also be specified by adding the following to the command:
 ```bash
@@ -70,7 +89,8 @@ It is also possible to provide additional arguments to populate the metadata in 
 
 ```
 usage: motec_log_generator.py [-h] [--output OUTPUT] [--frequency FREQUENCY]
-                              [--dbc DBC] [--driver DRIVER]
+                              [--dbc DBC] [--laps-file LAPS_FILE]
+                              [--driver DRIVER]
                               [--vehicle_id VEHICLE_ID]
                               [--vehicle_weight VEHICLE_WEIGHT]
                               [--vehicle_type VEHICLE_TYPE]
@@ -95,6 +115,10 @@ options:
   --frequency FREQUENCY
                         Fixed frequency to resample all channels at
   --dbc DBC             Path to DBC file, required if log type CAN
+  --laps-file LAPS_FILE
+                        Path to a file of end-of-lap timestamps (one per line,
+                        seconds, same time base as the log). When set, a .ldx
+                        sidecar is written so MoTeC i2 splits the log into laps.
   --driver DRIVER       Motec log metadata field
   --vehicle_id VEHICLE_ID
                         Motec log metadata field

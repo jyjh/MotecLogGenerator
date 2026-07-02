@@ -1,8 +1,10 @@
 import datetime
+import os
 import numpy as np
 import struct
 from data_log import DataLog, Message, Channel
-from ldparser.ldparser import ldVehicle, ldVenue, ldEvent, ldHead, ldChan, ldData
+from ldparser.ldparser import ldVehicle, ldVenue, ldEvent, ldHead, ldChan, ldData, \
+    write_ldx_beacons
 
 class MotecLog(object):
     """ Handles generating a MoTeC .ld file from log data.
@@ -38,6 +40,11 @@ class MotecLog(object):
         # File components from ldparser
         self.ld_header = None
         self.ld_channels = []
+
+        # Optional end-of-lap beacon timestamps in microseconds since log
+        # start. When populated, MotecLog.write emits a matching .ldx sidecar
+        # so MoTeC i2 can split the log into laps.
+        self.lap_times_us = []
 
     def initialize(self):
         """ Initializes all the meta data for the motec log.
@@ -131,3 +138,10 @@ class MotecLog(object):
         else:
             with open(filename, "wb") as f:
                 self.ld_header.write(f, 0)
+
+        # If lap beacons were supplied, write a same-basename .ldx sidecar so
+        # MoTeC i2 can split the log into laps. The .ld data itself is
+        # unaffected; the .ldx only carries the end-of-lap BCN markers.
+        if self.lap_times_us:
+            ldx_filename = os.path.splitext(filename)[0] + ".ldx"
+            write_ldx_beacons(ldx_filename, self.lap_times_us)
